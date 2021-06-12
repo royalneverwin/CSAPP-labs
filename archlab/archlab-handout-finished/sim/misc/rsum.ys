@@ -1,0 +1,37 @@
+#1900011102
+#王新昊
+	.pos 0
+	irmovq stack,%rsp
+	call main
+	halt
+	.align 8
+array:
+ele1:
+	.quad 0x00a
+	.quad ele2
+ele2:
+	.quad 0x0b0
+	.quad ele3
+ele3:
+	.quad 0xc00
+	.quad 0
+main:
+	irmovq array,%rdi
+	call rsum_list
+	ret
+rsum_list:
+	andq	%rdi,%rdi
+	jne	L2
+	irmovq	$0x0,%rax
+	ret   
+L2:
+	pushq	%rbx
+	mrmovq	(%rdi),%rbx
+	mrmovq	0x8(%rdi),%rdi
+	call  rsum_list	
+	addq    %rbx,%rax
+	popq    %rbx
+	ret
+	.pos 0x200
+stack:
+

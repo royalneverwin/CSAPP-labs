@@ -1,0 +1,66 @@
+#1900011102
+#王新昊
+	.pos 0
+	irmovq stack,%rsp
+	call main
+	halt
+	.align 8
+Array:
+	.quad 0xbca
+	.quad 0xcba
+	.quad 0xacb
+	.quad 0xcab
+	.quad 0xabc
+	.quad 0xbac
+main:
+	irmovq Array,%rdi
+	irmovq $6,%rsi
+	call bubble_sort
+	ret
+bubble_sort:
+	pushq 	%r8
+	pushq 	%r9
+	pushq 	%r10
+	pushq	%r11
+	pushq	%r12
+	rrmovq 	%rdi,%r8
+	irmovq $8,%r11
+	irmovq $1,%r12
+loop1:
+	addq	%r11,%r8
+	subq	%r12,%rsi
+	jne	loop1
+	subq	%r11,%r8
+	rrmovq  %r8,%rsi
+	jmp	loop2
+loop5:
+	addq    %r11,%rax
+loop3:
+	rrmovq	%rax,%r9
+	subq	%rsi,%r9
+	jge	loop4
+	mrmovq	0x8(%rax),%rdx
+	mrmovq	(%rax),%rcx
+	rrmovq	%rdx,%r10
+	subq	%rcx,%r10
+	jge	loop5
+	rmmovq	%rcx,0x8(%rax)
+	rmmovq	%rdx,(%rax)
+	jmp	loop5
+loop4:
+	subq    %r11,%rsi
+loop2:
+	rrmovq	%rsi,%r8
+	subq	%rdi,%r8
+	jle	end
+	rrmovq	%rdi,%rax
+	jmp	loop3
+end:
+	popq	%r12
+	popq	%r11
+	popq	%r10
+	popq	%r9
+	popq	%r8
+	ret
+	.pos 0x500
+stack:

@@ -1,0 +1,214 @@
+/*王新昊 1900011102*/
+
+
+#include "cachelab.h"
+#include <getopt.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+
+/*打印help菜单*/
+void PrintHelp(){
+    printf(" -h: Optional help flag that prints usage info\n");
+    printf(" -v: Optional verbose flag that displays trace info\n");
+    printf("-s <s>: Number of set index bits (S = 2s is the number of sets)\n");
+    printf("-E <E>: Associativity (number of lines per set)\n");
+    printf("-b <b>: Number of block bits (B = 2b is the block size)\n");
+    printf("-t <tracefile>: Name of the valgrind trace to replay\n");
+}
+
+
+/*定义一个行*/
+struct line{
+    int tag;    /*标记位*/
+    int valid;   /*有效位*/
+    int existTime;   /*用于LRU判断是否交换*/
+}
+
+
+/*定义一个组*/
+struct set{
+    struct line *lines;  /*一组里面的行*/
+}
+
+
+/*定义整个cache*/
+struct cache{
+    int s;  /*cache的组数*/
+    int b;  /*cache里面的行数*/
+    int E;  /*每组的行数*/
+    struct set *sets;   /*cache里面的组*/
+}
+
+
+/*创造cache变量*/
+struct cache scache;
+
+/*命中次数*/
+int hit_count = 0;  
+
+/*未命中次数*/
+int miss_count = 0;    
+
+/*从cache中移除块次数*/
+int eviction_count = 0;     
+
+/命令行参数是否有“-v”*/
+int ifV = 0;    
+
+
+
+/*初始化cache*/
+void InitializeCache(int s, int E, int b){
+    int i, j;
+    scache.s = s;
+    scache.E = E;
+    scache.b = b;
+    scache.sets = (struct set*)malloc(s * sizeof(struct set));
+    for(i = 0; i < s; i++){  /初始化set*/
+        scache.sets[i].lines = (struct line*)malloc(E * sizeof(strcut line));
+        for(j = 0; j < E; j++){  /*初始化line*/
+            scache.sets[i].lines[j].tag = -1;
+            scache.sets[i].lines[j].valid = 0;
+            scache.sets[i].lines[j].existTime = 0;
+        }
+    }
+}
+
+
+/*通过address得到tag*/
+unsigned long GetTag(unsigned long address, int s, int b){
+    return (address >> (s + b));
+}
+
+
+/*通过address得到set*/
+unsigned int GetSet(unsigned long address, int s, int b){
+    unsigned long temp = 1;
+    unsigned long sum =  0;
+    int i;
+    for(i = 1; i <= s; i++){
+        sum += temp;
+        temp *= 2;
+    }
+    return (address >> b) & sum;
+}
+
+
+/*更新每行的existTime*/
+void UpdateExistTime(int s, int E){
+    int i. j;
+    for(i = 0; i < s; i++){
+        for(j = 0; j < E; j++){
+            if(scache.sets[i].lines[j].valid == 1){
+                cache.sets[i].lines[j].existTime++;
+            }
+        }
+    }
+}
+
+
+/*在组getSet中寻找是否有地点放置或匹配到相同标记*/
+void FindPlace(unsigned long getTag, unsigned int getSet, int s, int E){
+    int i;
+    int maxExistTime = 0;
+    int maxIndex = 0;
+    for(i = 0; i < E; i++){  /*在cache中读到数据*/
+        if(scache.sets[getSet].lines[i].tag == getTag){
+            hit_count++;
+            if(ifV){    /*如果有-V显示verbose*/
+                printf(" hit");
+            }
+            return;
+        }
+    }
+    flagMiss = 1;
+    if(ifV){    /*如果有-V显示verbose*/
+        printf(" miss");
+    }
+    miss_count++;
+    for(i = 0; i < E; i++){  /*在cache中未读到但set未满*/
+        if(scache.sets[getSet].lines[i].valid == 0){
+            scache.sets[getSet].lines[i].valid = 1;
+            scache.sets[getSet].lines[i].tag = getTag;
+            return;
+        }
+    }
+    flagEviction = 1;
+    eviction_count++;
+    if(ifV){    /*如果有-V显示verbose*/
+        printf(" eviction");
+    }
+    for(i = 0; i < E; i++){  /*在cache中读到但set满了*/
+        if(scache.sets[getSet].lines[i].existTime > maxExistTime){
+            maxExistTime = scache.sets[getSet].lines[i].existTime;
+            maxIndex = i;
+        }
+    }
+    scache.sets[getSet].lines[maxIndex].tag = getTag;
+    return;
+}
+
+
+/*main函数*/
+int main(int argc, char *argv[]){
+    int result;  /*用来遍历*argv[]*/
+    int s;  /*存放s*/
+    int E;  /*存放E*/
+    int b;  /*存放b*/
+    char tracefile[50];  /*存放文件名*/
+    unsigned long address;   /*操作的地址*/
+    char op;    /*操作*/
+    int size;   /*大小*/
+    unsigned long getTag;     /*通过address得到tag*/
+    unsigned int getSet;     /*通过address得到set*/
+    while((result = getopt(argc, argv, "hvs:e:b:t:")) != -1){
+        switch(result){
+            case 'h':   /*if -h*/
+                PrintHelp();
+            case 'v':   /*if -v*/
+                ifV = 1;
+            case 's':   /*处理 -s*/
+                s = atoi(optarg);
+            case 'E':   /*处理 -E*/
+                E = atoi(optarg);
+            case 'b':   /*处理 -b*/
+                b = atoi(optarg);
+            case 't':   /*处理 -t*/
+                strcpy(tracefile, optarg);
+                break;
+            default:
+                PrintHelp();
+                return 0;
+        }
+    }
+    InitializeCache(s, E, b);
+    File tfile = fopen(tracefile, "r");
+    while(fscanf(tfile, " %c%lx,%d", op, address, size) != EOF){
+        getTag = GetTag(address, s, b);
+        getSet = GetSet(address, s, b);
+        flagMiss = flagEviction = 0;
+        if(ifV){       /*如果有-v，输出verbose*/
+            printf("%c %lx,%d", op, address, size);
+        }
+        switch(op){
+            case 'L':
+                FindPlace(getTag, getSet, s, E);
+            case 'S':
+                FindPlace(getTag, getSet, s, E);
+            case 'M':
+                FindPlace(getTag, getSet, s, E);
+                FindPlace(getTag, getSet, s, E);
+            default:
+            break;
+        }
+        if(ifV){       /*如果有-v，输出verbose*/
+            printf("\n");
+        }
+        UpdateExistTime(s, E);
+    }
+    printSummary(hit_count, miss_count, eviction_count);
+    return 0;
+}
